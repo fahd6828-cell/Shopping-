@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (build + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+  mobile:
+    name: Mobile (typecheck)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+
+  extension:
+    name: Extension (syntax + manifest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax-check scripts
+        run: |
+          for f in content.js background.js popup.js options.js shared/settings.js; do
+            node --check "$f"
+          done
+      - name: Validate manifest (MV3 keys, locales, icons)
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          m = json.load(open('manifest.json'))
+          assert m['manifest_version'] == 3, 'must be MV3'
+          for k in ('name', 'version', 'description', 'background',
+                    'content_scripts', 'action', 'options_ui', 'icons'):
+              assert k in m, f'missing manifest key: {k}'
+          assert m['background']['type'] == 'module'
+          for loc in ('ar', 'en'):
+              json.load(open(f'_locales/{loc}/messages.json'))
+          for size, path in m['icons'].items():
+              assert os.path.exists(path), f'missing icon: {path}'
+          print('manifest OK')
+          EOF
