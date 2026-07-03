@@ -29,18 +29,24 @@ CREATE TYPE language_code AS ENUM ('ar', 'en');
 
 -- ----------------------------------------------------------------------------
 -- users — app accounts (mobile + extension sign-in)
+-- Anonymous flow: the mobile app registers a device_id (client-generated
+-- UUID) with a push token, no email/password; a real account can be
+-- attached later. Every user has at least one identity (see CHECK).
 -- ----------------------------------------------------------------------------
 CREATE TABLE users (
     id                 UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-    email              CITEXT        NOT NULL UNIQUE,
+    email              CITEXT        UNIQUE,
     phone              VARCHAR(20),                       -- E.164, e.g. +9665xxxxxxx
-    password_hash      TEXT          NOT NULL,            -- bcrypt/argon2, never plaintext
-    display_name       VARCHAR(100)  NOT NULL,
+    password_hash      TEXT,                              -- bcrypt/argon2, never plaintext
+    device_id          UUID          UNIQUE,              -- anonymous device identity
+    display_name       VARCHAR(100)  NOT NULL DEFAULT 'ضيف',
     country_code       CHAR(2)       NOT NULL DEFAULT 'SA',
     preferred_language language_code NOT NULL DEFAULT 'ar',
     push_token         TEXT,                              -- FCM/APNs token for price alerts
     created_at         TIMESTAMPTZ   NOT NULL DEFAULT now(),
-    updated_at         TIMESTAMPTZ   NOT NULL DEFAULT now()
+    updated_at         TIMESTAMPTZ   NOT NULL DEFAULT now(),
+
+    CONSTRAINT users_identity_check CHECK (email IS NOT NULL OR device_id IS NOT NULL)
 );
 
 -- ----------------------------------------------------------------------------

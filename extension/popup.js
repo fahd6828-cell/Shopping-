@@ -12,9 +12,8 @@
  * store/coupon strings can never inject markup.
  */
 
-"use strict";
+import { getSettings } from "./shared/settings.js";
 
-const API_BASE_URL = "http://localhost:3000"; // keep in sync with background.js
 const app = document.getElementById("app");
 
 const ARABIC_CURRENCY = {
@@ -65,9 +64,19 @@ function renderComparison(product, comparison) {
     app.append(current);
   }
 
+  // Server is still scraping some stores — show what we have and re-poll.
+  if (comparison && comparison.refreshing) {
+    const note = el("div", "refreshing-note");
+    note.append(el("div", "spinner small"), el("span", null, "جارٍ تحديث الأسعار من المتاجر…"));
+    app.append(note);
+    setTimeout(init, 2500);
+  }
+
   const offers = (comparison && comparison.results) || [];
   if (offers.length === 0) {
-    app.append(stateMessage("لم نعثر على عروض لهذا المنتج حاليًا 😕"));
+    if (!comparison || !comparison.refreshing) {
+      app.append(stateMessage("لم نعثر على عروض لهذا المنتج حاليًا 😕"));
+    }
     return;
   }
 
@@ -181,8 +190,10 @@ function renderManualSearch() {
 async function manualSearch(query) {
   app.replaceChildren(stateMessage("جارٍ مقارنة الأسعار…", true));
   try {
+    const settings = await getSettings();
     const res = await fetch(
-      `${API_BASE_URL}/api/search?query=${encodeURIComponent(query)}&country=SA`
+      `${settings.apiBaseUrl}/api/search` +
+        `?query=${encodeURIComponent(query)}&country=${settings.country}`
     );
     if (!res.ok) throw new Error(`API ${res.status}`);
     renderComparison(null, await res.json());

@@ -1,8 +1,11 @@
 import express from "express";
 import { config } from "./config.js";
 import { initRedis, closeRedis } from "./lib/redis.js";
+import { closeQueues } from "./lib/queue.js";
 import { pool } from "./lib/db.js";
 import { searchRouter } from "./routes/search.js";
+import { trackingRouter } from "./routes/tracking.js";
+import { listingsRouter } from "./routes/listings.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -20,6 +23,8 @@ app.use((_req, res, next) => {
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.use("/api", searchRouter);
+app.use("/api", trackingRouter);
+app.use("/api", listingsRouter);
 
 // Central error handler — uncaught route errors become clean 500s.
 app.use(
@@ -43,7 +48,7 @@ const server = app.listen(config.port, async () => {
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     server.close(async () => {
-      await Promise.allSettled([pool.end(), closeRedis()]);
+      await Promise.allSettled([pool.end(), closeRedis(), closeQueues()]);
       process.exit(0);
     });
   });

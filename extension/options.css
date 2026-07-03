@@ -1,0 +1,62 @@
+/* سوقلي options page — same design tokens as the popup. */
+:root {
+  --green: #0e9f6e;
+  --green-dark: #057a55;
+  --ink: #1f2a37;
+  --ink-soft: #6b7280;
+  --line: #e5e7eb;
+  --bg: #f9fafb;
+  --card: #ffffff;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Segoe UI", Tahoma, "Noto Kufi Arabic", "Cairo", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  display: grid;
+  place-items: start center;
+  min-height: 100vh;
+  padding: 32px 16px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+  width: min(440px, 100%);
+  display: grid;
+  gap: 18px;
+}
+
+h1 { font-size: 18px; color: var(--green-dark); }
+
+.field { display: grid; gap: 6px; }
+.label { font-size: 13px; font-weight: 600; }
+.hint { font-size: 11px; color: var(--ink-soft); }
+
+select, input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--bg);
+}
+
+button {
+  border: none;
+  background: var(--green);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+button:hover { background: var(--green-dark); }
+
+.status { font-size: 12px; color: var(--green-dark); min-height: 1em; }

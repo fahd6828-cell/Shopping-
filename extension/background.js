@@ -1,26 +1,14 @@
 /**
- * سوقلي — service worker (Manifest V3)
+ * سوقلي — service worker (Manifest V3, ES module)
  *
  * Receives detected products from content scripts, queries the Souqly
  * backend for the cross-store comparison, caches the result per tab in
- * chrome.storage.session (survives the worker being suspended, cleared
- * when the browser closes), and badges the toolbar icon with the number
- * of cheaper offers found elsewhere.
+ * chrome.storage.session, badges the toolbar icon with the number of
+ * cheaper offers, and tells the content script to show the on-page
+ * banner when there's real money to save.
  */
 
-"use strict";
-
-// PRODUCTION: point at the deployed API and mirror it in host_permissions.
-const API_BASE_URL = "http://localhost:3000";
-
-/** Store slug → country whose shipping rates make the comparison fair. */
-const STORE_COUNTRY = {
-  "amazon-sa": "SA",
-  "amazon-ae": "AE",
-  noon: "AE",
-  namshi: "AE",
-  trendyol: "SA",
-};
+import { getSettings } from "./shared/settings.js";
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message && message.type === "PRODUCT_DETECTED" && sender.tab) {
@@ -44,11 +32,11 @@ async function handleProductDetected(product, tabId) {
 
   await setTabState(tabId, { status: "loading", product });
 
-  const country = STORE_COUNTRY[product.store] || "SA";
+  const settings = await getSettings();
   const url =
-    `${API_BASE_URL}/api/search` +
+    `${settings.apiBaseUrl}/api/search` +
     `?query=${encodeURIComponent(cleanTitle(product.title))}` +
-    `&country=${country}`;
+    `&country=${settings.country}`;
 
   try {
     const res = await fetch(url);
@@ -57,32 +45,62 @@ async function handleProductDetected(product, tabId) {
 
     await setTabState(tabId, { status: "ready", product, comparison });
     updateBadge(tabId, product, comparison);
+    maybeShowBanner(tabId, product, comparison);
+
+    // Data still refreshing server-side (worker scraping): try once more
+    // shortly so the tab ends up with the complete comparison.
+    if (comparison.refreshing) {
+      setTimeout(() => {
+        handleProductDetected(product, tabId).catch(() => {});
+      }, 4000);
+    }
   } catch (err) {
-    await setTabState(tabId, {
-      status: "error",
-      product,
-      error: err.message,
-    });
+    await setTabState(tabId, { status: "error", product, error: err.message });
     chrome.action.setBadgeText({ tabId, text: "" });
   }
 }
 
-/**
- * Badge = number of offers cheaper than what the user is looking at.
- * No price extracted → show total number of offers instead.
- */
-function updateBadge(tabId, product, comparison) {
+/** Offers strictly cheaper than what the user is looking at. */
+function cheaperOffers(product, comparison) {
   const offers = (comparison && comparison.results) || [];
+  if (typeof product.price !== "number") return [];
+  return offers.filter((o) => o.total_price < product.price);
+}
+
+function updateBadge(tabId, product, comparison) {
+  const cheaper = cheaperOffers(product, comparison);
   const count =
     typeof product.price === "number"
-      ? offers.filter((o) => o.total_price < product.price).length
-      : offers.length;
+      ? cheaper.length
+      : ((comparison && comparison.results) || []).length;
 
   chrome.action.setBadgeBackgroundColor({ tabId, color: "#0e9f6e" });
-  chrome.action.setBadgeText({
-    tabId,
-    text: count > 0 ? String(count) : "",
-  });
+  chrome.action.setBadgeText({ tabId, text: count > 0 ? String(count) : "" });
+}
+
+/** On-page banner only when the best alternative saves a meaningful amount. */
+function maybeShowBanner(tabId, product, comparison) {
+  const cheaper = cheaperOffers(product, comparison);
+  const best = cheaper[0]; // results are sorted by total ascending
+  if (!best) return;
+
+  const savings = product.price - best.total_price;
+  if (savings < 1) return;
+
+  chrome.tabs
+    .sendMessage(tabId, {
+      type: "SHOW_BANNER",
+      banner: {
+        savings,
+        currency: best.currency,
+        storeNameAr: best.store.name_ar || best.store.name,
+        offerUrl: best.product_url,
+        couponCode: best.coupons?.[0]?.code ?? null,
+      },
+    })
+    .catch(() => {
+      /* tab navigated away — nothing to do */
+    });
 }
 
 /**

@@ -12,6 +12,9 @@ export interface RawListing {
   price: number;
   currency: string;
   inStock: boolean;
+  /** Store-native SKU (ASIN, Noon SKU) — primary key for re-checks. */
+  sku?: string | null;
+  brand?: string | null;
 }
 
 export interface CouponDto {
@@ -39,6 +42,8 @@ export interface StoreOfferDto {
     name_ar: string;
     logo_url: string | null;
   };
+  /** DB listing id — used by clients to track this offer for price alerts. */
+  listing_id: string | null;
   product_title: string;
   product_url: string;
   image_url: string | null;
@@ -62,6 +67,11 @@ export interface SearchResponseDto {
   results: StoreOfferDto[];
   /** Slugs of stores that failed/timed out this round (partial results). */
   failed_stores: string[];
+  /**
+   * True when background scrape jobs were still running at response time —
+   * clients should re-query in a few seconds for complete results.
+   */
+  refreshing: boolean;
   cached: boolean;
   fetched_at: string;
 }

@@ -2,6 +2,7 @@ import { Image, StyleSheet, Text, View } from "react-native";
 import type { StoreOfferDto } from "../api/client";
 import { colors, formatPriceAr, radius, spacing } from "../theme";
 import { CouponButton } from "./CouponButton";
+import { TrackButton } from "./TrackButton";
 
 interface Props {
   offer: StoreOfferDto;
@@ -58,6 +59,8 @@ export function ProductCard({ offer, isBest }: Props) {
           storeUrl={offer.product_url}
         />
       ))}
+
+      <TrackButton listingId={offer.listing_id} />
     </View>
   );
 }

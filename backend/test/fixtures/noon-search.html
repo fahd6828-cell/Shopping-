@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<!-- Fixture: minimal Noon search results page matching the selector
+     assumptions documented in src/adapters/noonScraper.ts.
+     Structure mirrors the data-qa attributes Noon's product grid uses;
+     refresh this fixture from a live page when selectors are re-verified. -->
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><title>نون - نتائج البحث</title></head>
+<body>
+  <div id="catalog">
+    <div data-qa="product-item">
+      <a href="/uae-ar/apple-iphone-16-128gb-black/N70106183V/p/?o=abc" title="Apple iPhone 16 128GB أسود">
+        <img src="https://f.nooncdn.com/p/v1604429971/N70106183V_1.jpg" alt="">
+      </a>
+      <div data-qa="product-name">آبل آيفون 16 بسعة 128 جيجابايت - أسود</div>
+      <div class="priceRow">
+        <span data-qa="price-now">3,249.00</span>
+        <span data-qa="price-was">3,449.00</span>
+      </div>
+    </div>
+
+    <div data-qa="product-item">
+      <a href="/uae-ar/apple-iphone-16-128gb-teal/N70106184W/p/" title="Apple iPhone 16 128GB Teal">
+        <img src="https://f.nooncdn.com/p/v1604429972/N70106184W_1.jpg" alt="">
+      </a>
+      <div data-qa="product-name">آبل آيفون 16 بسعة 128 جيجابايت - أزرق مخضر</div>
+      <div class="priceRow">
+        <span data-qa="price-now">٣٬٢٩٩٫٠٠</span>
+      </div>
+    </div>
+
+    <div data-qa="product-item">
+      <a href="/uae-ar/apple-iphone-16-case/N70200300Z/p/" title="iPhone 16 Case">
+        <img src="https://f.nooncdn.com/p/v1604429973/N70200300Z_1.jpg" alt="">
+      </a>
+      <div data-qa="product-name">غطاء حماية لهاتف آيفون 16</div>
+      <div class="priceRow">
+        <span data-qa="price-now">49.00</span>
+      </div>
+      <div data-qa="out-of-stock">نفدت الكمية</div>
+    </div>
+
+    <!-- card without a product link: must be skipped, not crash -->
+    <div data-qa="product-item">
+      <div data-qa="product-name">إعلان ممول</div>
+    </div>
+  </div>
+</body>
+</html>
