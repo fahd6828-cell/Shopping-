@@ -41,10 +41,11 @@
 ### 1. Infrastructure (PostgreSQL + Redis)
 
 ```bash
-docker compose up -d
+docker compose up -d                          # infrastructure only (dev)
+docker compose --profile app up -d --build    # full stack: API + worker containers
 ```
 
-Schema (`backend/db/schema.sql`) and seed data (`backend/db/seed.sql`) are applied automatically on first boot.
+Schema (`backend/db/schema.sql`) and seed data (`backend/db/seed.sql`) are applied automatically on first boot. Production setup, environment variables, and the go-live checklist live in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ### 2. Backend
 

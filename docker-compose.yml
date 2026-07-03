@@ -1,4 +1,46 @@
+# Default (`docker compose up -d`): infrastructure only — Postgres + Redis —
+# for local development with `npm run dev`.
+# Full stack (`docker compose --profile app up -d --build`): adds the API and
+# the scrape/alert worker built from backend/Dockerfile. See docs/DEPLOYMENT.md.
 services:
+  api:
+    build:
+      context: ./backend
+      target: api
+    container_name: souqly-api
+    profiles: ["app"]
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://souqly:souqly_dev@postgres:5432/souqly
+      REDIS_URL: redis://redis:6379
+      QUEUE_MODE: queue
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      target: worker
+    container_name: souqly-worker
+    profiles: ["app"]
+    environment:
+      DATABASE_URL: postgres://souqly:souqly_dev@postgres:5432/souqly
+      REDIS_URL: redis://redis:6379
+      QUEUE_MODE: queue
+      # Flip to "true" (and provide proxies) to scrape real stores.
+      SCRAPER_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     container_name: souqly-postgres
