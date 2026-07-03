@@ -1,1 +1,12 @@
 node_modules/
+# React Native / native builds
+build/
+android/.gradle/
+android/app/build/
+android/build/
+ios/Pods/
+ios/build/
+ios/*.xcworkspace/xcuserdata/
+*.hprof
+.bundle/
+vendor/
