@@ -1,10 +1,14 @@
 {
   "name": "souqly-mobile",
   "version": "0.1.0",
-  "description": "Souqly mobile UI components (React Native, Arabic RTL) — drop into an RN app shell",
+  "description": "Souqly — Arabic-first shopping assistant mobile app (React Native)",
   "private": true,
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "start": "react-native start",
+    "typecheck": "tsc --noEmit",
+    "bundle:android": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output build/index.android.bundle --assets-dest build/res"
   },
   "dependencies": {
     "@react-native-clipboard/clipboard": "^1.14.1",
@@ -20,6 +24,14 @@
   },
   "devDependencies": {
     "@types/react": "^18.3.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "@babel/core": "^7.20.0",
+    "@babel/preset-env": "^7.20.0",
+    "@babel/runtime": "^7.20.0",
+    "@react-native/babel-preset": "0.75.4",
+    "@react-native/metro-config": "0.75.4",
+    "@react-native-community/cli": "14.1.0",
+    "@react-native-community/cli-platform-android": "14.1.0",
+    "@react-native-community/cli-platform-ios": "14.1.0"
   }
 }

@@ -1,12 +1,27 @@
 # Souqly Mobile — تطبيق سوقلي
 
-React Native (TypeScript) app shell for Souqly: bottom-tab navigation (بحث / المتتبَّعة / الإعدادات), price tracking with a history sparkline, and full Arabic RTL. Native projects (`ios/`, `android/`) are not committed — generate them and copy this folder's files in:
+Complete React Native (TypeScript) app: bottom-tab navigation (بحث / المتتبَّعة / الإعدادات), price tracking with a history sparkline, full Arabic RTL, and the native `android/` + `ios/` projects checked in (RN 0.75.4). The launcher name is **سوقلي** on both platforms.
+
+## Build & run on a device
 
 ```bash
-npx @react-native-community/cli init SouqlyApp --version 0.75.4
-# then copy App.tsx, index.js, src/ and merge package.json dependencies
-cd ios && pod install   # iOS
+npm install
+
+# Android (needs Android Studio / SDK, or a connected device with ADB)
+npm run android              # debug build + install
+cd android && ./gradlew assembleRelease   # release APK
+
+# iOS (macOS only)
+cd ios && bundle install && bundle exec pod install && cd ..
+npm run ios
 ```
+
+The backend URL is `http://10.0.2.2:3000` (Android-emulator loopback) in
+`src/api/client.ts` — change it for a physical device (your machine's LAN IP)
+or production.
+
+**JS-only sanity check** (no SDK needed): `npm run bundle:android` produces the
+production Metro bundle and fails on any import/config error.
 
 ## RTL setup (once, in your app's entry point)
 
