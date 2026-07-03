@@ -1,9 +1,11 @@
-# Souqly Mobile — واجهة نتائج البحث
+# Souqly Mobile — تطبيق سوقلي
 
-React Native (TypeScript) components for the Arabic search-results screen. This folder is a **component library**, not a full app shell — drop `src/` into an app created with:
+React Native (TypeScript) app shell for Souqly: bottom-tab navigation (بحث / المتتبَّعة / الإعدادات), price tracking with a history sparkline, and full Arabic RTL. Native projects (`ios/`, `android/`) are not committed — generate them and copy this folder's files in:
 
 ```bash
 npx @react-native-community/cli init SouqlyApp --version 0.75.4
+# then copy App.tsx, index.js, src/ and merge package.json dependencies
+cd ios && pod install   # iOS
 ```
 
 ## RTL setup (once, in your app's entry point)
@@ -19,24 +21,21 @@ I18nManager.forceRTL(true);   // Arabic-first app
 
 With RTL forced, React Native mirrors `flexDirection: "row"` automatically, and the styles in `src/theme.ts` use logical properties (`marginStart` / `paddingEnd`) so nothing needs per-direction overrides.
 
-## Usage
-
-```tsx
-import { SearchResultsScreen } from "./src/screens/SearchResultsScreen";
-
-// Renders live results from the backend, or bundled mock data when
-// the API is unreachable (development mode).
-<SearchResultsScreen initialQuery="آيفون 16" country="SA" />
-```
-
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `src/screens/SearchResultsScreen.tsx` | Search header + loading/empty/error states + offers list |
-| `src/components/ProductCard.tsx` | One store offer: price, shipping, total, coupons |
+| `App.tsx` | Bottom tabs (بحث / المتتبَّعة / الإعدادات) + details stack |
+| `index.js` | Entry point — forces RTL before registration |
+| `src/screens/SearchResultsScreen.tsx` | Search + offers list, silent re-poll while backend refreshes |
+| `src/screens/TrackedProductsScreen.tsx` | Tracked listings with change-since-save (↓ green / ↑ red) |
+| `src/screens/ProductDetailsScreen.tsx` | Current price + history sparkline (`/api/listings/:id/history`) |
+| `src/screens/SettingsScreen.tsx` | Country picker, persisted + synced to the device profile |
+| `src/components/ProductCard.tsx` | One store offer: price, shipping, total, coupons, track button |
 | `src/components/CouponButton.tsx` | "انسخ الكوبون وتوجه للمتجر" — copy code then open store |
-| `src/api/client.ts` | Typed fetch to `GET /api/search`, mirrors backend DTOs |
+| `src/components/TrackButton.tsx` | "🔔 تتبّع السعر" — subscribes to price-drop pushes |
+| `src/components/Sparkline.tsx` | Pure react-native-svg polyline, no chart library |
+| `src/api/client.ts` | Typed client: search, device registration, tracking, history |
 | `src/api/mockData.ts` | Offline fixture matching the API contract |
 | `src/theme.ts` | Colors, spacing, Arabic-friendly typography |
 

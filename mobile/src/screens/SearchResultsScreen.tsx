@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import {
+  getCountry,
   searchProducts,
   type SearchResponseDto,
   type StoreOfferDto,
@@ -19,7 +20,10 @@ import { colors, radius, spacing } from "../theme";
 
 interface Props {
   initialQuery?: string;
-  /** Shopper country — drives currency and shipping (SA, AE, KW, EG). */
+  /**
+   * Shopper country — drives currency and shipping (SA, AE, KW, EG).
+   * Omitted = read the user's choice from Settings (AsyncStorage).
+   */
   country?: string;
   /** Development flag: render bundled mock data if the API is unreachable. */
   fallbackToMock?: boolean;
@@ -40,26 +44,39 @@ type ScreenState =
  */
 export function SearchResultsScreen({
   initialQuery = "",
-  country = "SA",
+  country,
   fallbackToMock = true,
 }: Props) {
   const [query, setQuery] = useState(initialQuery);
   const [state, setState] = useState<ScreenState>({ kind: "idle" });
   const inflight = useRef<AbortController | null>(null);
+  const repoll = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const runSearch = useCallback(
-    async (text: string) => {
+    async (text: string, silent = false) => {
       const trimmed = text.trim();
       if (trimmed.length < 2) return;
 
       inflight.current?.abort();
+      if (repoll.current) clearTimeout(repoll.current);
       const controller = new AbortController();
       inflight.current = controller;
 
-      setState({ kind: "loading" });
+      if (!silent) setState({ kind: "loading" });
       try {
-        const response = await searchProducts(trimmed, country, controller.signal);
+        const searchCountry = country ?? (await getCountry());
+        const response = await searchProducts(
+          trimmed,
+          searchCountry,
+          controller.signal
+        );
         setState({ kind: "ready", response });
+
+        // Server still scraping some stores — silently re-query shortly so
+        // the list completes without flashing the loading state.
+        if (response.refreshing) {
+          repoll.current = setTimeout(() => void runSearch(trimmed, true), 3000);
+        }
       } catch (err) {
         if (controller.signal.aborted) return;
         if (fallbackToMock) {
@@ -78,7 +95,10 @@ export function SearchResultsScreen({
 
   useEffect(() => {
     if (initialQuery) void runSearch(initialQuery);
-    return () => inflight.current?.abort();
+    return () => {
+      inflight.current?.abort();
+      if (repoll.current) clearTimeout(repoll.current);
+    };
   }, [initialQuery, runSearch]);
 
   return (
@@ -149,6 +169,7 @@ function ResultsList({ response }: { response: SearchResponseDto }) {
         <Text style={styles.summary}>
           {response.results.length} عروض · مرتبة من الأرخص (شامل الشحن)
           {response.cached ? " · من الذاكرة المؤقتة" : ""}
+          {response.refreshing ? " · جارٍ تحديث الأسعار…" : ""}
         </Text>
       }
       ListFooterComponent={

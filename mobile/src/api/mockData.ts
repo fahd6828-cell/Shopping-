@@ -10,9 +10,11 @@ export const MOCK_SEARCH_RESPONSE: SearchResponseDto = {
   currency: "SAR",
   cached: false,
   failed_stores: [],
+  refreshing: false,
   fetched_at: new Date().toISOString(),
   results: [
     {
+      listing_id: null,
       store: {
         slug: "noon",
         name: "Noon",
@@ -42,6 +44,7 @@ export const MOCK_SEARCH_RESPONSE: SearchResponseDto = {
       ],
     },
     {
+      listing_id: null,
       store: {
         slug: "amazon-sa",
         name: "Amazon Saudi Arabia",
@@ -71,6 +74,7 @@ export const MOCK_SEARCH_RESPONSE: SearchResponseDto = {
       ],
     },
     {
+      listing_id: null,
       store: {
         slug: "amazon-ae",
         name: "Amazon UAE",
