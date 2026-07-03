@@ -2,13 +2,17 @@ import { Worker } from "bullmq";
 import { config } from "./config.js";
 import { pool } from "./lib/db.js";
 import {
+  PRICE_CHECK_QUEUE,
   SCRAPE_QUEUE,
   createQueueConnection,
+  getPriceCheckQueue,
+  type PriceCheckJobData,
   type ScrapeJobData,
 } from "./lib/queue.js";
 import { runAdapter } from "./adapters/storeAdapter.js";
 import { getAdapter } from "./adapters/index.js";
 import { persistListings } from "./services/catalogService.js";
+import { runPriceCheckSweep } from "./services/alertService.js";
 
 /**
  * Souqly worker — the only process that talks to external stores.
@@ -62,13 +66,44 @@ scrapeWorker.on("failed", (job, err) => {
   );
 });
 
+/* ------------------------------------------------------------------ */
+/* price-check: hourly sweep of tracked listings → refresh + alerts    */
+/* ------------------------------------------------------------------ */
+
+const priceCheckWorker = new Worker<PriceCheckJobData>(
+  PRICE_CHECK_QUEUE,
+  async () => runPriceCheckSweep(),
+  { connection: createQueueConnection(), concurrency: 1 }
+);
+
+priceCheckWorker.on("completed", (_job, result) => {
+  console.log("[worker] price-check sweep done:", result);
+});
+priceCheckWorker.on("failed", (_job, err) => {
+  console.warn("[worker] price-check sweep failed:", err.message);
+});
+
+/** Register (idempotently) the hourly schedule on startup. */
+async function scheduleHourlyPriceCheck(): Promise<void> {
+  await getPriceCheckQueue().upsertJobScheduler(
+    "hourly-price-check",
+    { pattern: "0 * * * *" }, // top of every hour
+    { name: "sweep", data: {} }
+  );
+}
+
+scheduleHourlyPriceCheck().catch((err) =>
+  console.error("[worker] failed to register price-check schedule:", err)
+);
+
 console.log(
-  `[worker] consuming '${SCRAPE_QUEUE}' (mode=${config.queueMode}, scraper=${config.scraperEnabled ? "real" : "mock"})`
+  `[worker] consuming '${SCRAPE_QUEUE}' + '${PRICE_CHECK_QUEUE}' ` +
+    `(mode=${config.queueMode}, scraper=${config.scraperEnabled ? "real" : "mock"})`
 );
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, async () => {
-    await scrapeWorker.close();
+    await Promise.allSettled([scrapeWorker.close(), priceCheckWorker.close()]);
     await pool.end();
     process.exit(0);
   });
