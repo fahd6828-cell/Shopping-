@@ -153,10 +153,110 @@ new MutationObserver(() => {
   }
 }).observe(document.body, { childList: true, subtree: true });
 
-// The popup asks us directly when opened on a page whose report was missed.
+// The popup asks us directly when opened on a page whose report was missed;
+// the service worker tells us to show the cheaper-price banner.
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message && message.type === "GET_PRODUCT_INFO") {
     sendResponse({ product: extractProduct() });
+  } else if (message && message.type === "SHOW_BANNER") {
+    showBanner(message.banner);
   }
   return false;
 });
+
+/* ------------------------------------------------------------------ */
+/* on-page banner                                                      */
+/* ------------------------------------------------------------------ */
+
+const BANNER_HOST_ID = "souqly-banner-host";
+
+/**
+ * Renders a dismissible RTL banner at the top of the page inside a shadow
+ * root, so store CSS can't leak in and ours can't leak out. Dismissal is
+ * remembered per page URL for the tab session.
+ */
+function showBanner(banner) {
+  if (!banner || sessionStorage.getItem(bannerDismissKey())) return;
+  document.getElementById(BANNER_HOST_ID)?.remove();
+
+  const host = document.createElement("div");
+  host.id = BANNER_HOST_ID;
+  const shadow = host.attachShadow({ mode: "closed" });
+
+  const style = document.createElement("style");
+  style.textContent = `
+    .banner {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647;
+      direction: rtl;
+      display: flex; align-items: center; gap: 12px;
+      background: linear-gradient(135deg, #057a55, #0e9f6e);
+      color: #fff; padding: 10px 16px;
+      font-family: "Segoe UI", Tahoma, sans-serif; font-size: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.25);
+    }
+    .msg { flex: 1; }
+    .msg b { font-weight: 800; }
+    .coupon {
+      background: rgba(255,255,255,.18); border: 1px dashed rgba(255,255,255,.6);
+      border-radius: 6px; padding: 2px 8px; font-weight: 700;
+      direction: ltr; unicode-bidi: embed;
+    }
+    .go {
+      background: #fff; color: #057a55; text-decoration: none;
+      font-weight: 800; padding: 6px 14px; border-radius: 8px; white-space: nowrap;
+    }
+    .close {
+      background: none; border: none; color: rgba(255,255,255,.8);
+      font-size: 18px; cursor: pointer; padding: 2px 6px; line-height: 1;
+    }
+  `;
+
+  const wrap = document.createElement("div");
+  wrap.className = "banner";
+
+  const msg = document.createElement("span");
+  msg.className = "msg";
+  const amount = formatBannerPrice(banner.savings, banner.currency);
+  msg.append(`وجدنا نفس المنتج أرخص بـ `);
+  const strong = document.createElement("b");
+  strong.textContent = amount;
+  msg.append(strong, ` في ${banner.storeNameAr}`);
+  if (banner.couponCode) {
+    msg.append(" · كوبون: ");
+    const code = document.createElement("span");
+    code.className = "coupon";
+    code.textContent = banner.couponCode;
+    msg.append(code);
+  }
+
+  const go = document.createElement("a");
+  go.className = "go";
+  go.href = banner.offerUrl;
+  go.target = "_blank";
+  go.rel = "noopener noreferrer";
+  go.textContent = "اعرض العرض ←";
+
+  const close = document.createElement("button");
+  close.className = "close";
+  close.setAttribute("aria-label", "إغلاق");
+  close.textContent = "✕";
+  close.addEventListener("click", () => {
+    sessionStorage.setItem(bannerDismissKey(), "1");
+    host.remove();
+  });
+
+  wrap.append(msg, go, close);
+  shadow.append(style, wrap);
+  document.documentElement.append(host);
+}
+
+function bannerDismissKey() {
+  return `souqly-banner-dismissed:${location.href}`;
+}
+
+const BANNER_CURRENCY_AR = { SAR: "ر.س", AED: "د.إ", KWD: "د.ك", EGP: "ج.م" };
+
+function formatBannerPrice(amount, currency) {
+  const label = BANNER_CURRENCY_AR[currency] || currency;
+  return `${amount.toLocaleString("ar-SA", { maximumFractionDigits: 0 })} ${label}`;
+}
