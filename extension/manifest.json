@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_appName__",
+  "short_name": "__MSG_appShortName__",
+  "description": "__MSG_appDescription__",
+  "version": "0.1.0",
+  "default_locale": "ar",
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "__MSG_actionTitle__"
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.amazon.sa/*",
+        "https://amazon.sa/*",
+        "https://www.amazon.ae/*",
+        "https://amazon.ae/*",
+        "https://www.noon.com/*",
+        "https://noon.com/*",
+        "https://www.namshi.com/*",
+        "https://namshi.com/*",
+        "https://www.trendyol.com/*",
+        "https://trendyol.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "permissions": ["storage", "activeTab"],
+
+  "host_permissions": ["http://localhost:3000/*"],
+
+  "minimum_chrome_version": "110"
+}

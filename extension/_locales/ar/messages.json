@@ -1,0 +1,18 @@
+{
+  "appName": {
+    "message": "سوقلي — مساعد التسوق الذكي",
+    "description": "Extension name"
+  },
+  "appShortName": {
+    "message": "سوقلي",
+    "description": "Short extension name"
+  },
+  "appDescription": {
+    "message": "قارن الأسعار بين أمازون ونون ونمشي واحصل على كوبونات الخصم تلقائيًا أثناء التسوق",
+    "description": "Extension description"
+  },
+  "actionTitle": {
+    "message": "سوقلي — قارن السعر الآن",
+    "description": "Toolbar button tooltip"
+  }
+}

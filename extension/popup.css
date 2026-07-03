@@ -1,0 +1,216 @@
+/* سوقلي popup — Arabic-first RTL design.
+   The layout is written in logical properties (margin-inline-start, …) so it
+   would mirror correctly even if a future LTR locale is added. */
+
+:root {
+  --green: #0e9f6e;
+  --green-dark: #057a55;
+  --ink: #1f2a37;
+  --ink-soft: #6b7280;
+  --line: #e5e7eb;
+  --bg: #f9fafb;
+  --card: #ffffff;
+  --gold: #b45309;
+  --gold-bg: #fef3c7;
+  font-size: 14px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 380px;
+  max-height: 560px;
+  overflow-y: auto;
+  font-family: "Segoe UI", Tahoma, "Noto Kufi Arabic", "Cairo", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* ---------- header ---------- */
+.header {
+  background: linear-gradient(135deg, var(--green-dark), var(--green));
+  color: #fff;
+  padding: 12px 16px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-badge {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 20px;
+  font-weight: 700;
+}
+.brand-name { font-size: 17px; font-weight: 700; }
+.brand-tagline { font-size: 11px; opacity: 0.85; }
+
+/* ---------- generic states ---------- */
+.state {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+.spinner {
+  width: 28px;
+  height: 28px;
+  margin: 0 auto 12px;
+  border: 3px solid var(--line);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- current product ---------- */
+.current-product {
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 16px;
+}
+.current-product .label { font-size: 11px; color: var(--ink-soft); }
+.current-product .title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- offers ---------- */
+.offers { padding: 10px 12px; display: grid; gap: 8px; }
+
+.offer {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.offer.best { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+
+.offer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.store-name { font-weight: 700; font-size: 13px; }
+.best-tag {
+  background: var(--green);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.offer-title {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.total { font-size: 17px; font-weight: 800; color: var(--green-dark); }
+.shipping { font-size: 11px; color: var(--ink-soft); }
+.shipping.free { color: var(--green); font-weight: 600; }
+
+/* ---------- coupons ---------- */
+.coupon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: var(--gold-bg);
+  border: 1px dashed var(--gold);
+  border-radius: 8px;
+}
+.coupon-info { min-width: 0; }
+.coupon-code {
+  font-family: ui-monospace, "Courier New", monospace;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--gold);
+  letter-spacing: 1px;
+  direction: ltr;          /* codes are Latin — keep them LTR inside RTL */
+  unicode-bidi: embed;
+}
+.coupon-desc {
+  font-size: 11px;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.copy-btn {
+  flex-shrink: 0;
+  border: none;
+  background: var(--gold);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.copy-btn:hover { filter: brightness(1.1); }
+.copy-btn.copied { background: var(--green); }
+
+/* ---------- go-to-store ---------- */
+.go-btn {
+  display: block;
+  margin-top: 8px;
+  text-align: center;
+  background: var(--green);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px;
+  border-radius: 8px;
+}
+.go-btn:hover { background: var(--green-dark); }
+
+/* ---------- footer ---------- */
+.footer {
+  padding: 8px 16px;
+  font-size: 10px;
+  color: var(--ink-soft);
+  text-align: center;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
+
+/* ---------- manual search (unsupported pages) ---------- */
+.search-box { display: flex; gap: 6px; padding: 12px 16px 4px; }
+.search-box input {
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+}
+.search-box button {
+  border: none;
+  background: var(--green);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-family: inherit;
+}

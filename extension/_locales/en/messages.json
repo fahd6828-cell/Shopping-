@@ -1,0 +1,18 @@
+{
+  "appName": {
+    "message": "Souqly — Smart Shopping Assistant",
+    "description": "Extension name"
+  },
+  "appShortName": {
+    "message": "Souqly",
+    "description": "Short extension name"
+  },
+  "appDescription": {
+    "message": "Compare prices across Amazon, Noon and Namshi, and auto-find working coupons while you shop",
+    "description": "Extension description"
+  },
+  "actionTitle": {
+    "message": "Souqly — compare the price now",
+    "description": "Toolbar button tooltip"
+  }
+}
