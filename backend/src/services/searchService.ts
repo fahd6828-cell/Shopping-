@@ -1,27 +1,30 @@
 import { config, convertCurrency, COUNTRY_CURRENCY } from "../config.js";
 import { pool } from "../lib/db.js";
 import { cacheGet, cacheSet } from "../lib/redis.js";
-import { runAdapter, type StoreAdapter } from "../adapters/storeAdapter.js";
-import { amazonSaAdapter } from "../adapters/amazonSaAdapter.js";
-import { noonAdapter } from "../adapters/noonAdapter.js";
+import { enqueueScrape, getScrapeQueueEvents } from "../lib/queue.js";
+import { runAdapter } from "../adapters/storeAdapter.js";
+import { ADAPTERS } from "../adapters/index.js";
+import {
+  findListingsByQuery,
+  persistListings,
+  type DbListingRow,
+} from "./catalogService.js";
 import { getActiveCouponsByStore } from "./couponService.js";
 import { getShippingRates, resolveShipping } from "./shippingService.js";
-import type { SearchResponseDto, StoreOfferDto } from "../types.js";
-
-/** Registered store integrations. Add an adapter here to add a store. */
-const ADAPTERS: StoreAdapter[] = [amazonSaAdapter, noonAdapter];
+import type { RawListing, SearchResponseDto, StoreOfferDto } from "../types.js";
 
 /**
  * The search pipeline:
  *
- *   1. Redis cache lookup (TTL 3h) — identical queries never re-hit stores.
- *   2. Cache miss: fan out to all store adapters in parallel; each has its
- *      own timeout and failures degrade to partial results.
- *   3. Enrich every listing with shipping to the shopper's country and the
- *      store's active coupons (single batched DB query each).
- *   4. Convert to the shopper's currency, compute total = item + shipping,
- *      sort ascending by total.
- *   5. Store in Redis and return.
+ *   1. Redis cache (TTL 3h) — identical queries never re-hit stores.
+ *   2a. inline mode (dev): run adapters in-process, persist to the catalog,
+ *       serve the adapter results directly.
+ *   2b. queue mode (prod): serve from catalog listings; when they're stale
+ *       or missing, enqueue scrape jobs for the worker and wait briefly —
+ *       if jobs are still running at answer time, `refreshing: true` tells
+ *       clients to re-query shortly.
+ *   3. Enrich with shipping + coupons, convert currency, sort by total.
+ *   4. Cache and return.
  */
 export async function searchProducts(
   query: string,
@@ -29,9 +32,8 @@ export async function searchProducts(
 ): Promise<SearchResponseDto> {
   const normalizedQuery = normalizeQuery(query);
   const targetCurrency = COUNTRY_CURRENCY[country] ?? "SAR";
-  const cacheKey = `search:v1:${country}:${normalizedQuery}`;
+  const cacheKey = `search:v2:${country}:${normalizedQuery}`;
 
-  // 1. cache
   const cached = await cacheGet(cacheKey);
   if (cached) {
     const dto = JSON.parse(cached) as SearchResponseDto;
@@ -39,16 +41,132 @@ export async function searchProducts(
     return dto;
   }
 
-  // 2. fan out to stores
+  const gathered =
+    config.queueMode === "queue"
+      ? await gatherViaQueue(normalizedQuery)
+      : await gatherInline(normalizedQuery);
+
+  const results = await enrich(gathered.listings, country, targetCurrency);
+
+  const response: SearchResponseDto = {
+    query: normalizedQuery,
+    country,
+    currency: targetCurrency,
+    results,
+    failed_stores: gathered.failedStores,
+    refreshing: gathered.refreshing,
+    cached: false,
+    fetched_at: new Date().toISOString(),
+  };
+
+  // Cache only complete, non-empty snapshots — a store outage or an
+  // in-flight refresh must not pin bad data for 3 hours.
+  if (results.length > 0 && !gathered.refreshing) {
+    await cacheSet(cacheKey, JSON.stringify(response), config.searchCacheTtlSeconds);
+  }
+  return response;
+}
+
+interface Gathered {
+  listings: EnrichableListing[];
+  failedStores: string[];
+  refreshing: boolean;
+}
+
+/** The common shape enrich() consumes, from adapters or from the DB. */
+interface EnrichableListing extends RawListing {
+  listingId: string | null;
+}
+
+/* ------------------------------------------------------------------ */
+/* inline mode: adapters in-process (dev / tests)                      */
+/* ------------------------------------------------------------------ */
+
+async function gatherInline(query: string): Promise<Gathered> {
   const settled = await Promise.all(
-    ADAPTERS.map((a) => runAdapter(a, normalizedQuery, config.adapterTimeoutMs))
+    ADAPTERS.map((a) => runAdapter(a, query, config.adapterTimeoutMs))
   );
-  const listings = settled.flatMap((r) => r.listings);
+  const raw = settled.flatMap((r) => r.listings);
   const failedStores = ADAPTERS.filter((_, i) => settled[i]!.failed).map(
     (a) => a.storeSlug
   );
 
-  // 3. batched enrichment
+  // Feed the catalog even in dev so history/tracking features have data.
+  let ids = new Map<string, string>();
+  try {
+    const persisted = await persistListings(raw);
+    ids = new Map(persisted.map((p) => [`${p.storeSlug}:${p.url}`, p.listingId]));
+  } catch (err) {
+    console.warn("[search] catalog persist failed:", (err as Error).message);
+  }
+
+  return {
+    listings: raw.map((l) => ({
+      ...l,
+      listingId: ids.get(`${l.storeSlug}:${l.url}`) ?? null,
+    })),
+    failedStores,
+    refreshing: false,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* queue mode: DB first, worker refreshes (production)                 */
+/* ------------------------------------------------------------------ */
+
+async function gatherViaQueue(query: string): Promise<Gathered> {
+  let rows = await findListingsByQuery(query);
+
+  const freshCutoff = Date.now() - config.listingFreshnessMs;
+  const freshStores = new Set(
+    rows
+      .filter((r) => r.last_checked_at.getTime() >= freshCutoff)
+      .map((r) => r.store_slug)
+  );
+  const staleAdapters = ADAPTERS.filter((a) => !freshStores.has(a.storeSlug));
+
+  let refreshing = false;
+  if (staleAdapters.length > 0) {
+    const jobs = await Promise.all(
+      staleAdapters.map((a) => enqueueScrape(a.storeSlug, query))
+    );
+
+    // Give the worker a short window; first-search UX beats a spinner-only
+    // response, but we never block longer than scrapeWaitMs.
+    const events = getScrapeQueueEvents();
+    const outcomes = await Promise.allSettled(
+      jobs.map((job) => job.waitUntilFinished(events, config.scrapeWaitMs))
+    );
+    refreshing = outcomes.some((o) => o.status === "rejected");
+
+    rows = await findListingsByQuery(query);
+  }
+
+  return { listings: rows.map(dbRowToListing), failedStores: [], refreshing };
+}
+
+function dbRowToListing(row: DbListingRow): EnrichableListing {
+  return {
+    listingId: row.listing_id,
+    storeSlug: row.store_slug,
+    title: row.title,
+    url: row.url,
+    imageUrl: row.image_url,
+    price: row.price,
+    currency: row.currency,
+    inStock: row.in_stock,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* enrichment: shipping + coupons + FX + sort                          */
+/* ------------------------------------------------------------------ */
+
+async function enrich(
+  listings: EnrichableListing[],
+  country: string,
+  targetCurrency: string
+): Promise<StoreOfferDto[]> {
   const storeSlugs = [...new Set(listings.map((l) => l.storeSlug))];
   const [storeMeta, couponsByStore, shippingByStore] = await Promise.all([
     getStoreMeta(storeSlugs),
@@ -56,9 +174,8 @@ export async function searchProducts(
     getShippingRates(storeSlugs, country),
   ]);
 
-  // 4. build offers in shopper currency
-  const results: StoreOfferDto[] = listings
-    .filter((l) => storeMeta.has(l.storeSlug)) // unknown store = misconfigured adapter
+  return listings
+    .filter((l) => storeMeta.has(l.storeSlug))
     .map((l) => {
       const meta = storeMeta.get(l.storeSlug)!;
       const price = convertCurrency(l.price, l.currency, targetCurrency);
@@ -70,6 +187,7 @@ export async function searchProducts(
       );
       return {
         store: meta,
+        listing_id: l.listingId,
         product_title: l.title,
         product_url: l.url,
         image_url: l.imageUrl,
@@ -84,23 +202,6 @@ export async function searchProducts(
       };
     })
     .sort((a, b) => a.total_price - b.total_price);
-
-  const response: SearchResponseDto = {
-    query: normalizedQuery,
-    country,
-    currency: targetCurrency,
-    results,
-    failed_stores: failedStores,
-    cached: false,
-    fetched_at: new Date().toISOString(),
-  };
-
-  // 5. cache — only when at least one store answered, so an outage
-  //    doesn't pin an empty result for 3 hours.
-  if (results.length > 0) {
-    await cacheSet(cacheKey, JSON.stringify(response), config.searchCacheTtlSeconds);
-  }
-  return response;
 }
 
 /** Lowercase, collapse whitespace — maximizes cache hit rate. */

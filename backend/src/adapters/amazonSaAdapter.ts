@@ -24,6 +24,8 @@ class AmazonSaAdapter implements StoreAdapter {
         price: listing.Price.Amount,
         currency: listing.Price.Currency,
         inStock: listing.Availability?.Type !== "OUT_OF_STOCK",
+        sku: item.ASIN,
+        brand: item.ItemInfo.ByLineInfo?.Brand?.DisplayValue ?? null,
       };
     });
   }
@@ -92,7 +94,10 @@ interface PaApiSearchResponse {
     Items: Array<{
       ASIN: string;
       DetailPageURL: string;
-      ItemInfo: { Title: { DisplayValue: string } };
+      ItemInfo: {
+        Title: { DisplayValue: string };
+        ByLineInfo?: { Brand?: { DisplayValue: string } };
+      };
       Images: { Primary?: { Large?: { URL: string } } } | null;
       Offers: {
         Listings: Array<{

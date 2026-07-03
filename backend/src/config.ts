@@ -14,6 +14,32 @@ export const config = {
   searchCacheTtlSeconds: Number(process.env.SEARCH_CACHE_TTL_SECONDS ?? 10_800),
   /** A slow/blocked store must not stall the whole comparison. */
   adapterTimeoutMs: Number(process.env.ADAPTER_TIMEOUT_MS ?? 8_000),
+
+  /**
+   * "queue"  — searches read the DB and enqueue BullMQ scrape jobs consumed
+   *            by the separate worker process (production mode).
+   * "inline" — adapters run synchronously inside the API request
+   *            (single-process dev mode, no worker needed).
+   */
+  queueMode: (process.env.QUEUE_MODE ?? "inline") as "queue" | "inline",
+  /** How long the API waits for in-flight scrape jobs before answering. */
+  scrapeWaitMs: Number(process.env.SCRAPE_WAIT_MS ?? 4_000),
+  /** DB listings younger than this serve searches without a re-scrape. */
+  listingFreshnessMs: Number(process.env.LISTING_FRESHNESS_MS ?? 10_800_000),
+
+  /** Real Playwright scraping (worker only); off = adapters use their mocks. */
+  scraperEnabled: process.env.SCRAPER_ENABLED === "true",
+  chromiumPath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+
+  /** Amazon PA-API 5 — absent credentials = adapters fall back to mocks. */
+  paapi: {
+    accessKey: process.env.AMAZON_PAAPI_ACCESS_KEY ?? "",
+    secretKey: process.env.AMAZON_PAAPI_SECRET_KEY ?? "",
+    partnerTag: process.env.AMAZON_PAAPI_PARTNER_TAG ?? "",
+  },
+
+  /** Firebase service account JSON (stringified) — absent = dry-run pushes. */
+  firebaseServiceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON ?? "",
 } as const;
 
 /**

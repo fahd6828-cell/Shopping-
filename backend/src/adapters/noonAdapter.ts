@@ -34,6 +34,7 @@ class NoonAdapter implements StoreAdapter {
       price: hit.sale_price ?? hit.price,
       currency: "AED",
       inStock: hit.is_buyable,
+      sku: hit.sku,
     }));
   }
 

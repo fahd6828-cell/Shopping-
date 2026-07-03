@@ -1,6 +1,7 @@
 import express from "express";
 import { config } from "./config.js";
 import { initRedis, closeRedis } from "./lib/redis.js";
+import { closeQueues } from "./lib/queue.js";
 import { pool } from "./lib/db.js";
 import { searchRouter } from "./routes/search.js";
 
@@ -43,7 +44,7 @@ const server = app.listen(config.port, async () => {
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     server.close(async () => {
-      await Promise.allSettled([pool.end(), closeRedis()]);
+      await Promise.allSettled([pool.end(), closeRedis(), closeQueues()]);
       process.exit(0);
     });
   });
